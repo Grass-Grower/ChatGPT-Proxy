@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ChatGPT Proxy</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="card">
+    <h1>ChatGPT Proxy</h1>
+    <p class="muted">Send an HTTP request through the proxy.</p>
+    <form id="proxy-form">
+      <label for="url">Destination URL</label>
+      <div class="row">
+        <input id="url" name="url" type="url" placeholder="https://example.com" required autocomplete="url">
+        <select id="method" aria-label="HTTP method">
+          <option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option>
+        </select>
+      </div>
+      <label for="body">Request body <span>(optional)</span></label>
+      <textarea id="body" rows="8" placeholder="JSON or other request data"></textarea>
+      <button type="submit">Send request</button>
+    </form>
+    <section id="result" class="result" hidden>
+      <div class="result-head"><strong>Response</strong><span id="status"></span></div>
+      <pre id="output"></pre>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

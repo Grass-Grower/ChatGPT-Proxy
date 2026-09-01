@@ -8,6 +8,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import java.net.*;
+import java.security.MessageDigest;
 import java.util.*;
 
 @RestController
@@ -16,12 +17,10 @@ public class ProxyController {
     private final String apiKey;
     private final Set<String> allowedHosts;
 
-    public ProxyController(
-            @Value("${proxy.api-key:}") String apiKey,
-            @Value("${proxy.allowed-hosts:}") String allowedHosts) {
+    public ProxyController(@Value("${proxy.api-key:}") String apiKey, @Value("${proxy.allowed-hosts:}") String allowedHosts) {
         this.apiKey = apiKey.trim();
-        this.allowedHosts = Arrays.stream(allowedHosts.split(","))
-                .map(String::trim).map(String::toLowerCase).filter(s -> !s.isBlank()).collect(java.util.stream.Collectors.toSet());
+        this.allowedHosts = Arrays.stream(allowedHosts.split(",")).map(String::trim).map(String::toLowerCase)
+                .filter(s -> !s.isBlank()).collect(java.util.stream.Collectors.toSet());
     }
 
     @RequestMapping(value = "/proxy", method = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.DELETE})
@@ -56,7 +55,8 @@ public class ProxyController {
         Enumeration<String> names = request.getHeaderNames();
         while (names != null && names.hasMoreElements()) {
             String name = names.nextElement();
-            if (!Set.of("host", "content-length", "x-proxy-key", "connection", "transfer-encoding").contains(name.toLowerCase(Locale.ROOT))) {
+            String lower = name.toLowerCase(Locale.ROOT);
+            if (!Set.of("host", "content-length", "x-proxy-key", "connection", "transfer-encoding").contains(lower)) {
                 Enumeration<String> values = request.getHeaders(name);
                 while (values.hasMoreElements()) headers.add(name, values.nextElement());
             }
@@ -69,9 +69,10 @@ public class ProxyController {
             return spec.exchange((req, res) -> {
                 HttpHeaders responseHeaders = new HttpHeaders();
                 res.getHeaders().forEach((k, v) -> { if (!k.equalsIgnoreCase("connection")) responseHeaders.put(k, v); });
-                return ResponseEntity.status(res.getStatusCode()).headers(responseHeaders).body(res.getBody().readAllBytes());
+                try { return ResponseEntity.status(res.getStatusCode()).headers(responseHeaders).body(res.getBody().readAllBytes()); }
+                catch (java.io.IOException e) { throw new RestClientException("Unable to read upstream response", e); }
             });
-        } catch (RestClientException | java.io.IOException e) {
+        } catch (RestClientException e) {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Upstream request failed".getBytes());
         }
     }

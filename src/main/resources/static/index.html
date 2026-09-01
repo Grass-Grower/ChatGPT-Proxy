@@ -3,13 +3,22 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
   <title>ChatGPT Proxy</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
   <main class="card">
     <h1>ChatGPT Proxy</h1>
-    <p class="muted">Send an HTTP request through the proxy.</p>
+    <p class="muted">Search the web or open a site through the proxy.</p>
+    <form id="search-form">
+      <label for="search">Search or enter a site</label>
+      <div class="search-row">
+        <input id="search" type="text" placeholder="example.com, https://example.com, or a search" required autocomplete="url" maxlength="2048">
+        <button type="submit">Go</button>
+      </div>
+      <p class="hint">URLs are opened directly. Plain text searches use your configured search provider.</p>
+    </form>
     <form id="proxy-form">
       <label for="url">Destination URL</label>
       <div class="row">
@@ -19,7 +28,7 @@
         </select>
       </div>
       <label for="body">Request body <span>(optional)</span></label>
-      <textarea id="body" rows="8" placeholder="JSON or other request data"></textarea>
+      <textarea id="body" rows="6" placeholder="JSON or other request data" maxlength="5242880"></textarea>
       <button type="submit">Send request</button>
     </form>
     <section id="result" class="result" hidden>

@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
+    "build": "node -e \"console.log('Vercel build complete: static frontend + serverless API')\"",
     "test": "node --check api/proxy.js && node --check frontend/app.js"
   },
   "engines": { "node": ">=20" }

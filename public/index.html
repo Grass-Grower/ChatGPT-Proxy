@@ -1,1 +1,29 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self';style-src 'self';connect-src 'self';object-src 'none';base-uri 'none';form-action 'self'"><title>ChatGPT Proxy</title><link rel="stylesheet" href="/public/style.css"></head><body><main class="card"><h1>ChatGPT Proxy</h1><p class="muted">Browse websites through the protected proxy.</p><form id="search-form"><label for="search">Search or enter a site</label><div class="search-row"><input id="search" type="text" placeholder="example.com, https://example.com, or a search" maxlength="2048" required><button type="submit">Go</button></div><label for="api-key">Proxy API key</label><input id="api-key" type="password" autocomplete="off" placeholder="Enter your proxy key" maxlength="512" required><p class="hint">The key is used once to establish a secure session and is not placed in the URL.</p></form><section id="result" class="result" hidden><div class="result-head"><strong>Status</strong><span id="status"></span></div><pre id="output"></pre></section></main><script src="/public/app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self';style-src 'self';connect-src 'self';object-src 'none';base-uri 'none';form-action 'self'">
+  <title>ChatGPT Proxy</title>
+  <link rel="stylesheet" href="/public/style.css">
+</head>
+<body>
+  <main class="card">
+    <h1>ChatGPT Proxy</h1>
+    <p class="muted">Browse public websites through the protected proxy.</p>
+    <form id="search-form">
+      <label for="search">Search or enter a site</label>
+      <div class="search-row">
+        <input id="search" type="text" placeholder="example.com, https://example.com, or a search" maxlength="2048" required>
+        <button type="submit">Go</button>
+      </div>
+      <p class="hint">Your browser keeps a secure session after the first authentication.</p>
+    </form>
+    <section id="result" class="result" hidden>
+      <div class="result-head"><strong>Status</strong><span id="status"></span></div>
+      <pre id="output"></pre>
+    </section>
+  </main>
+  <script src="/public/app.js"></script>
+</body>
+</html>

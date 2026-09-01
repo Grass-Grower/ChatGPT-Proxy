@@ -2,7 +2,7 @@
   "version": 2,
   "cleanUrls": true,
   "buildCommand": "npm run build",
-  "outputDirectory": "frontend",
+  "outputDirectory": "public",
   "headers": [
     {
       "source": "/(.*)",
@@ -15,7 +15,6 @@
     }
   ],
   "rewrites": [
-    { "source": "/proxy", "destination": "/api/proxy" },
-    { "source": "/", "destination": "/proxy.html" }
+    { "source": "/proxy", "destination": "/api/proxy" }
   ]
 }

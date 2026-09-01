@@ -1,0 +1,9 @@
+{
+  "name": "chatgpt-proxy",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "test": "node --check api/proxy.js && node --check frontend/app.js"
+  },
+  "engines": { "node": ">=20" }
+}

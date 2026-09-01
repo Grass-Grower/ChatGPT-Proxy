@@ -1,6 +1,7 @@
 {
   "version": 2,
   "cleanUrls": true,
+  "buildCommand": "npm run build",
   "headers": [
     {
       "source": "/(.*)",
@@ -14,6 +15,6 @@
   ],
   "rewrites": [
     { "source": "/proxy", "destination": "/api/proxy" },
-    { "source": "/", "destination": "/index.html" }
+    { "source": "/", "destination": "/frontend/index.html" }
   ]
 }

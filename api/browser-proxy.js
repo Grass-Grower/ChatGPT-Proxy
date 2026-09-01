@@ -1,0 +1,36 @@
+const dns=require('node:dns').promises;
+const net=require('node:net');
+const crypto=require('node:crypto');
+const {URL}=require('node:url');
+const MAX_BODY=5*1024*1024,MAX_RESPONSE=10*1024*1024,SESSION_TTL=3600;
+const METHODS=new Set(['GET','POST','PUT','PATCH','DELETE']);
+const BLOCKED=new Set(['host','content-length','connection','transfer-encoding','x-proxy-key','authorization','proxy-authorization','cookie']);
+function privateIp(ip){if(net.isIPv4(ip)){const[a,b]=ip.split('.').map(Number);return a===0||a===10||a===127||(a===169&&b===254)||(a===172&&b>=16&&b<=31)||(a===192&&b===168)||a>=224;}if(net.isIPv6(ip)){const s=ip.toLowerCase();return s==='::'||s==='::1'||s.startsWith('fc')||s.startsWith('fd')||s.startsWith('fe8')||s.startsWith('fe9')||s.startsWith('fea')||s.startsWith('feb')||s.startsWith('ff');}return true;}
+function equal(a,b){if(typeof a!=='string'||typeof b!=='string'||a.length!==b.length)return false;return crypto.timingSafeEqual(Buffer.from(a),Buffer.from(b));}
+function allowed(host){const list=(process.env.PROXY_ALLOWED_HOSTS||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);return !list.length||list.some(x=>host===x||host.endsWith('.'+x));}
+function signature(ts){return crypto.createHmac('sha256',process.env.PROXY_API_KEY||'').update(String(ts)).digest('base64url');}
+function sessionValid(cookie){try{const m=String(cookie||'').match(/(?:^|;\s*)proxy_session=([^;]+)/);if(!m)return false;const[t,s]=decodeURIComponent(m[1]).split('.');const now=Math.floor(Date.now()/1000);return /^\d+$/.test(t)&&now-Number(t)>=0&&now-Number(t)<=SESSION_TTL&&equal(s,signature(t));}catch{return false;}}
+function sessionCookie(){const ts=Math.floor(Date.now()/1000);return `proxy_session=${encodeURIComponent(ts+'.'+signature(ts))}; Path=/; Max-Age=${SESSION_TTL}; HttpOnly; Secure; SameSite=Strict`;}
+function proxied(raw,base){try{const v=String(raw||'').trim();if(!v||/^(data:|javascript:|mailto:|tel:|#)/i.test(v))return null;const u=new URL(v,base);if(!['http:','https:'].includes(u.protocol))return null;return '/proxy?url='+encodeURIComponent(u.href);}catch{return null;}}
+function rewriteHtml(html,base){const attrs=['href','src','action','poster','data-src','data-href'];const tags='a|link|img|script|iframe|form|source|video|audio|track|object|input|button';const re=new RegExp(`(<(?:${tags})\\b[^>]*\\s)(${attrs.join('|')})(\\s*=\\s*["'])([^"']+)(["'])`,'ig');return html.replace(re,(m,p,a,e,v,q)=>{const n=proxied(v,base);return n?`${p}${a}${e}${n}${q}`:m;}).replace(/<base\b[^>]*>/ig,'');}
+module.exports=async function handler(req,res){
+  if(req.method==='OPTIONS')return res.status(204).end();
+  const key=String(req.headers['x-proxy-key']||''),expected=process.env.PROXY_API_KEY||'';
+  if(!expected)return res.status(500).json({error:'Proxy is not configured'});
+  const authed=equal(key,expected)||sessionValid(req.headers.cookie);
+  if(!authed)return res.status(401).json({error:'Unauthorized'});
+  if(equal(key,expected))res.setHeader('set-cookie',sessionCookie());
+  if(!METHODS.has(req.method))return res.status(405).json({error:'Method not allowed'});
+  let target;try{target=new URL(String(req.query.url||''));}catch{return res.status(400).json({error:'Invalid URL'});}
+  if(!['http:','https:'].includes(target.protocol)||!target.hostname)return res.status(400).json({error:'Only HTTP(S) URLs are allowed'});
+  const host=target.hostname.toLowerCase();if(!allowed(host))return res.status(403).json({error:'Destination not allowed'});
+  try{const records=await dns.lookup(host,{all:true});if(!records.length||records.some(r=>privateIp(r.address)))return res.status(403).json({error:'Private destination blocked'});}catch{return res.status(502).json({error:'Destination cannot be resolved'});}
+  const headers={};for(const[k,v]of Object.entries(req.headers)){if(!BLOCKED.has(k.toLowerCase())&&typeof v==='string')headers[k]=v;}
+  let body;if(req.method!=='GET'&&req.method!=='DELETE'){if(Number(req.headers['content-length']||0)>MAX_BODY)return res.status(413).json({error:'Request too large'});if(typeof req.body==='string')body=req.body;else if(req.body!==undefined)body=JSON.stringify(req.body);if(body&&Buffer.byteLength(body)>MAX_BODY)return res.status(413).json({error:'Request too large'});}
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+  try{const up=await fetch(target,{method:req.method,headers,body,redirect:'manual',signal:controller.signal});const loc=up.headers.get('location');if(loc){const p=proxied(loc,target.href);if(p)res.setHeader('location',p);}
+    const buf=Buffer.from(await up.arrayBuffer());if(buf.length>MAX_RESPONSE)return res.status(502).json({error:'Upstream response too large'});res.status(up.status);const ct=up.headers.get('content-type')||'';res.setHeader('cache-control','no-store');
+    if(ct.toLowerCase().includes('text/html')){res.setHeader('content-type','text/html; charset=utf-8');return res.send(Buffer.from(rewriteHtml(buf.toString('utf8'),target.href),'utf8'));}
+    if(ct)res.setHeader('content-type',ct);return res.send(buf);
+  }catch{return res.status(502).json({error:'Upstream request failed'});}finally{clearTimeout(timer);}
+};

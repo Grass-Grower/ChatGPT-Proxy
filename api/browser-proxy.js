@@ -12,13 +12,23 @@ function signature(ts){return crypto.createHmac('sha256',process.env.PROXY_API_K
 function sessionValid(cookie){try{const m=String(cookie||'').match(/(?:^|;\s*)proxy_session=([^;]+)/);if(!m)return false;const[t,s]=decodeURIComponent(m[1]).split('.');const now=Math.floor(Date.now()/1000);return /^\d+$/.test(t)&&now-Number(t)>=0&&now-Number(t)<=SESSION_TTL&&equal(s,signature(t));}catch{return false;}}
 function sessionCookie(){const ts=Math.floor(Date.now()/1000);return `proxy_session=${encodeURIComponent(ts+'.'+signature(ts))}; Path=/; Max-Age=${SESSION_TTL}; HttpOnly; Secure; SameSite=Strict`;}
 function proxied(raw,base){try{const v=String(raw||'').trim();if(!v||/^(data:|javascript:|mailto:|tel:|#)/i.test(v))return null;const u=new URL(v,base);if(!['http:','https:'].includes(u.protocol))return null;return '/proxy?url='+encodeURIComponent(u.href);}catch{return null;}}
-function rewriteHtml(html,base){const attrs=['href','src','action','poster','data-src','data-href'];const tags='a|link|img|script|iframe|form|source|video|audio|track|object|input|button';const re=new RegExp(`(<(?:${tags})\\b[^>]*\\s)(${attrs.join('|')})(\\s*=\\s*["'])([^"']+)(["'])`,'ig');return html.replace(re,(m,p,a,e,v,q)=>{const n=proxied(v,base);return n?`${p}${a}${e}${n}${q}`:m;}).replace(/<base\b[^>]*>/ig,'');}
+function escapeScriptString(v){return JSON.stringify(String(v)).replace(/<\//g,'<\\/');}
+function navigationBridge(base){
+  return `<script>(function(){
+const BASE=${escapeScriptString(base)};
+function toProxy(h){try{const u=new URL(h,BASE);if(!['http:','https:'].includes(u.protocol)||!u.hostname)return null;return '/proxy?url='+encodeURIComponent(u.href)}catch{return null}}
+function stop(e){if(!e)return;const a=e.target&&e.target.closest&&e.target.closest('a[href]');if(!a||e.defaultPrevented)return;const p=toProxy(a.getAttribute('href'));if(!p)return;if(a.target&&a.target!=='_self')return;e.preventDefault();e.stopImmediatePropagation();window.location.assign(p)}
+document.addEventListener('click',stop,true);
+document.addEventListener('auxclick',function(e){if(e.button!==0)return;const a=e.target&&e.target.closest&&e.target.closest('a[href]');if(!a)return;const p=toProxy(a.getAttribute('href'));if(!p||a.target&&a.target!=='_self')return;e.preventDefault();e.stopImmediatePropagation();window.location.assign(p)},true);
+const oldOpen=window.open;window.open=function(h){const p=toProxy(h);return p?oldOpen.call(window,p):oldOpen.apply(window,arguments)};
+})();</script>`;
+}
+function rewriteHtml(html,base){const attrs=['href','src','action','poster','data-src','data-href'];const tags='a|link|img|script|iframe|form|source|video|audio|track|object|input|button';const re=new RegExp(`(<(?:${tags})\\b[^>]*\\s)(${attrs.join('|')})(\\s*=\\s*["'])([^"']+)(["'])`,'ig');let out=html.replace(re,(m,p,a,e,v,q)=>{const n=proxied(v,base);return n?`${p}${a}${e}${n}${q}`:m;}).replace(/<base\b[^>]*>/ig,'');const bridge=navigationBridge(base);if(/<head\b[^>]*>/i.test(out))return out.replace(/<head\b[^>]*>/i,m=>m+bridge);return bridge+out;}
 module.exports=async function handler(req,res){
   if(req.method==='OPTIONS')return res.status(204).end();
   const key=String(req.headers['x-proxy-key']||''),expected=process.env.PROXY_API_KEY||'';
   if(!expected)return res.status(500).json({error:'Proxy is not configured'});
-  const authed=equal(key,expected)||sessionValid(req.headers.cookie);
-  if(!authed)return res.status(401).json({error:'Unauthorized'});
+  const authed=equal(key,expected)||sessionValid(req.headers.cookie);if(!authed)return res.status(401).json({error:'Unauthorized'});
   if(equal(key,expected))res.setHeader('set-cookie',sessionCookie());
   if(!METHODS.has(req.method))return res.status(405).json({error:'Method not allowed'});
   let target;try{target=new URL(String(req.query.url||''));}catch{return res.status(400).json({error:'Invalid URL'});}
